@@ -23,7 +23,6 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-import peft
 from peft import LoraConfig, get_peft_model
 import ray
 from ray import train
@@ -274,15 +273,15 @@ def training_function(kwargs: dict):
     ):
         lr_scheduler = get_linear_schedule_with_warmup(
             optimizer=optimizer,
-            num_warmup_steps=100,
-            num_training_steps=(train_ds_len * num_epochs)
+            num_warmup_steps=10 * batch_size,
+            num_training_steps=(train_ds_len * num_epochs * batch_size)
             // gradient_accumulation_steps,
         )
     else:
         lr_scheduler = DummyScheduler(
             optimizer,
-            total_num_steps=(train_ds_len * num_epochs) // gradient_accumulation_steps,
-            warmup_num_steps=100,
+            total_num_steps=(train_ds_len * num_epochs * batch_size) // gradient_accumulation_steps,
+            warmup_num_steps=10 * batch_size,
         )
 
     # Prepare everything
@@ -441,7 +440,6 @@ def training_function(kwargs: dict):
             "avg_bwd_time_per_epoch": bwd_time_sum / (step + 1),
             "learning_rate": lr_scheduler.get_lr()[0],
         }
-
         train.report(
             metrics,
             # We do not need to explictly call report(checkpoint).
