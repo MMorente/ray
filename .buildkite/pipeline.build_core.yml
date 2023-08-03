@@ -1,4 +1,4 @@
-#ci:group=core tests (civ2)
+#ci:group=:chef:core tests (civ2)
 
 - label: ":python:"
   conditions: ["RAY_CI_PYTHON_AFFECTED"]

@@ -70,8 +70,8 @@ def main(
         return
     logger.info(f"Running tests: {test_targets}")
     return_code = run_tests(
+        team,
         test_targets,
-        ["DL=1 ./ci/env/install-dependencies.sh"],
         parallelism_per_worker,
     )
     sys.exit(return_code)
