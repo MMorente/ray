@@ -54,17 +54,9 @@ fine_tune() {
         --test_path "${test_path}"  \
         --special_token_path "${token_path}" \
         --num-checkpoints-to-keep 1 \
-<<<<<<< HEAD
-        --num-epochs 3
-=======
-<<<<<<< Updated upstream
-        --num-epochs 1 \
-=======
         --num-epochs 3 \
         --lora \
         --lr 1e-4 \
->>>>>>> Stashed changes
->>>>>>> e235c8604b... wip
         "${params[@]}"; then
         echo "Failed to fine-tune the model. Exiting..."
         exit 1
