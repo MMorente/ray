@@ -35,10 +35,10 @@ bazel_workspace_dir = os.environ.get("BUILD_WORKSPACE_DIRECTORY", "")
     help=("Number of concurrent test jobs to run per worker."),
 )
 @click.option(
-    "--size",
-    default="small,medium,large",
+    "--except-tags",
+    default="",
     type=str,
-    help=("Size of tests to run."),
+    help=("Except tests with the given tags."),
 )
 @click.option(
     "--run-flaky-tests",
@@ -53,7 +53,7 @@ def main(
     workers: int,
     worker_id: int,
     parallelism_per_worker: int,
-    size: str,
+    except_tags: str,
     run_flaky_tests: bool,
 ) -> None:
     if not bazel_workspace_dir:
@@ -64,7 +64,7 @@ def main(
     if run_flaky_tests:
         test_targets = _get_flaky_test_targets(team)
     else:
-        test_targets = _get_test_targets(targets, team, workers, worker_id, size)
+        test_targets = _get_test_targets(targets, team, workers, worker_id, except_tags)
     if not test_targets:
         logging.info("No tests to run")
         return
@@ -82,43 +82,40 @@ def _get_test_targets(
     team: str,
     workers: int,
     worker_id: int,
-    size: str,
+    except_tags: str,
     yaml_dir: Optional[str] = None,
 ) -> List[str]:
     """
     Get test targets to run for a particular shard
     """
     return chunk_into_n(
-        _get_all_test_targets(targets, team, size, yaml_dir=yaml_dir),
+        _get_all_test_targets(targets, team, except_tags, yaml_dir=yaml_dir),
         workers,
     )[worker_id]
 
 
-def _get_all_test_query(targets: List[str], team: str, size: str) -> str:
+def _get_all_test_query(targets: List[str], team: str, except_tags: str) -> str:
     test_query = " union ".join([f"tests({target})" for target in targets])
-    team_query = f"attr(tags, team:{team}, {test_query})"
-    size_query = " union ".join(
-        [f"attr(size, {s}, {test_query})" for s in size.split(",")]
-    )
+    team_query = f"attr(tags, 'team:{team}\\\\b', {test_query})"
+    if not except_tags:
+        return team_query
+
     except_query = " union ".join(
-        [
-            f"attr(tags, {t}, {test_query})"
-            for t in ["debug_tests", "asan_tests", "xcommit"]
-        ]
+        [f"attr(tags, {t}, {test_query})" for t in except_tags.split(",")]
     )
 
-    return f"({team_query} intersect ({size_query})) except ({except_query})"
+    return f"{team_query} except ({except_query})"
 
 
 def _get_all_test_targets(
-    targets: str, team: str, size: str, yaml_dir: str
+    targets: str, team: str, except_tags: str, yaml_dir: str
 ) -> List[str]:
     """
     Get all test targets that are not flaky
     """
 
     test_targets = (
-        run_command(f"bazel query '{_get_all_test_query(targets, team, size)}'")
+        run_command(f'bazel query "{_get_all_test_query(targets, team, except_tags)}"')
         .decode("utf-8")
         .split("\n")
     )
