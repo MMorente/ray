@@ -3,8 +3,6 @@ import subprocess
 
 from typing import List
 
-from ci.ray_ci.utils import chunk_into_n
-
 DOCKER_ECR = "029272617770.dkr.ecr.us-west-2.amazonaws.com"
 DOCKER_REPO = "ci_base_images"
 DOCKER_TAG = f"oss-ci-build_{os.environ.get('BUILDKITE_COMMIT')}"
@@ -19,7 +17,7 @@ def run_tests(
     """
     Run tests parallelly in docker
     """
-    chunks = chunk_into_n(test_targets, parallelism)
+    chunks = [shard_tests(test_targets, parallelism, i) for i in range(parallelism)]
     _setup_test_environment(team)
     runs = [_run_tests_in_docker(chunk) for chunk in chunks]
     exits = [run.wait() for run in runs]
@@ -60,6 +58,20 @@ def run_command(command: str) -> bytes:
     """
     return subprocess.check_output(
         _get_docker_run_command() + ["/bin/bash", "-ice", command]
+    )
+
+
+def shard_tests(test_targets: List[str], shard_count: int, shard_id: int) -> List[str]:
+    """
+    Shard tests into N shards and return the shard corresponding to shard_id
+    """
+    return (
+        run_command(
+            "python ci/run/bazel_sharding/bazel_sharding.py "
+            f"--index {shard_id} --count {shard_count} {' '.join(test_targets)}"
+        )
+        .decode("utf-8")
+        .split()
     )
 
 
